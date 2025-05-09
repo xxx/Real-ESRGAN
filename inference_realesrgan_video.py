@@ -32,7 +32,14 @@ def get_video_meta_info(video_path):
     ret['height'] = video_streams[0]['height']
     ret['fps'] = eval(video_streams[0]['avg_frame_rate'])
     ret['audio'] = ffmpeg.input(video_path).audio if has_audio else None
-    ret['nb_frames'] = int(video_streams[0]['nb_frames'])
+    try:
+        ret['nb_frames'] = int(video_streams[0]['nb_frames'])
+    except KeyError:
+        # fall back to trying via ffprobe (needed for .e.g .mkv)
+        #ffprobe -v error -count_frames -select_streams v:0 -show_entries "stream=nb_read_frames" -of "default=nokey=1:noprint_wrappers=1" loudnormed/Hello\ faggot\ lovers!.mkv
+        command = ['ffprobe', '-v', 'error', '-count_frames', '-select_streams', 'v:0', '-show_entries', 'stream=nb_read_frames', '-of', 'default=nokey=1:noprint_wrappers=1', video_path]
+        result = subprocess.run(command, capture_output=True, text=True)
+        ret['nb_frames'] = int(result.stdout)
     return ret
 
 
@@ -202,7 +209,7 @@ def inference_video(args, video_save_path, device=None, total_workers=1, worker_
         ]
 
     # ---------------------- determine model paths ---------------------- #
-    model_path = os.path.join('weights', args.model_name + '.pth')
+    model_path = os.path.join(args.model_dir, args.model_name + '.pth')
     if not os.path.isfile(model_path):
         ROOT_DIR = os.path.dirname(os.path.abspath(__file__))
         for url in file_url:
@@ -238,7 +245,8 @@ def inference_video(args, video_save_path, device=None, total_workers=1, worker_
     if args.face_enhance:  # Use GFPGAN for face enhancement
         from gfpgan import GFPGANer
         face_enhancer = GFPGANer(
-            model_path='https://github.com/TencentARC/GFPGAN/releases/download/v1.3.0/GFPGANv1.3.pth',
+            #model_path='https://github.com/TencentARC/GFPGAN/releases/download/v1.3.0/GFPGANv1.3.pth',
+            model_path=f"{args.model_dir}/gfpgan/GFPGANv1.3.pth",
             upscale=args.outscale,
             arch='clean',
             channel_multiplier=2,
@@ -338,6 +346,7 @@ def main():
         help=('Model names: realesr-animevideov3 | RealESRGAN_x4plus_anime_6B | RealESRGAN_x4plus | RealESRNet_x4plus |'
               ' RealESRGAN_x2plus | realesr-general-x4v3'
               'Default:realesr-animevideov3'))
+    parser.add_argument('--model_dir', type=str, default='weights', help='Directory to load models from ')
     parser.add_argument('-o', '--output', type=str, default='results', help='Output folder')
     parser.add_argument(
         '-dn',
