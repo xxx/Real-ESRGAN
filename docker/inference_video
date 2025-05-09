@@ -1,0 +1,2 @@
+#!/bin/sh
+python3 /real-esrgan/inference_realesrgan_video.py "$@"
