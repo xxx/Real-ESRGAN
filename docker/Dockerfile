@@ -10,13 +10,13 @@ RUN wget "https://github.com/xinntao/Real-ESRGAN/releases/download/v0.2.5.0/real
 RUN wget "https://github.com/xinntao/facexlib/releases/download/v0.1.0/detection_Resnet50_Final.pth"
 RUN wget "https://github.com/xinntao/facexlib/releases/download/v0.2.2/parsing_parsenet.pth"
 
-WORKDIR /gfpgan
+WORKDIR /models/gfpgan
 RUN wget "https://github.com/TencentARC/GFPGAN/releases/download/v1.3.0/GFPGANv1.3.pth"
 
 FROM python:3.11-slim
 
 RUN apt-get update && apt-get -y install \
-    bash ffmpeg curl git
+    ffmpeg git
 
 WORKDIR /real-esrgan
 COPY requirements.txt .
@@ -24,9 +24,7 @@ RUN pip3 install --upgrade pip
 RUN pip3 install -r requirements.txt
 
 COPY . .
-COPY --from=builder /models/* weights
-RUN mkdir weights/gfpgan
-COPY --from=builder /gfpgan/* weights/gfpgan
+COPY --from=builder /models weights
 RUN python3 setup.py develop
 COPY --chmod=755 docker/inference_img docker/inference_video /usr/local/bin
 
